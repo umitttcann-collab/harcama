@@ -336,7 +336,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
       <div class="confirm" id="geriOnay" hidden style="margin-top:10px"><p id="geriMetin"></p>
         <div class="actions"><button type="button" class="primary" id="geriEvet">Ekle (telefondakiler kalır)</button><button type="button" class="ghost" id="geriHayir">Vazgeç</button></div></div>
     </div>
-    <p class="note" style="text-align:center">Kayıtlar yalnız bu telefonda durur. Ayda bir yedek alıp iCloud Drive'a kaydet.</p>
+    <p class="note" style="text-align:center">Kayıtlar yalnız bu telefonda durur. Ayda bir yedek alıp iCloud Drive'a kaydet.<br><span id="surumYazi">Sürüm 8</span></p>
   </section>
 </div>
 
@@ -876,7 +876,14 @@ $('cols').addEventListener('pointerleave',()=>$('tip').hidden=true);
 if(depoHata)toast('Kayıtlar okunamadı. Ayarlar → Yedekten yükle ile geri al.',true);
 if(!['ekle','ay','rapor','ayar'].includes(S.sekme))S.sekme='ekle';
 git(S.sekme);
-if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol==='https:'){
+  // yeni sürüm gelince kendiliğinden yenilen; açılışta ve uygulamaya her dönüşte güncelleme ara
+  const vardi=!!navigator.serviceWorker.controller;let yenilendi=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(vardi&&!yenilendi&&!S.duzenle&&!$('tutar').value){yenilendi=true;location.reload();}});
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reg.update().catch(()=>{});});
+  }).catch(()=>{});
+}
 })();
 </script>
 </body>

@@ -234,7 +234,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
           <div class="field"><label class="lbl" for="tarih" id="tarihLbl">Tarih</label><input type="date" id="tarih"></div>
           <div class="field"><label class="lbl" for="aciklama">Açıklama</label><input id="aciklama" placeholder="İsteğe bağlı" enterkeyhint="done"></div>
         </div>
-        <div class="actions" id="actNew"><button type="submit" class="primary">Kaydet</button></div>
+        <div class="actions" id="actNew"><button type="submit" class="primary" id="btnKaydet">Gideri kaydet</button></div>
         <div class="actions" id="actEdit" hidden>
           <button type="submit" class="primary">Güncelle</button>
           <button type="button" class="danger" id="btnSil">Sil</button>
@@ -450,6 +450,8 @@ function cizForm(){
   $('editHead').hidden=!d;
   if(d)$('editHead').textContent=d.taksitli?`Düzenleniyor: ${d.sira}/${d.toplamTaksit}. taksit (yalnız bu ay)`:'Kaydı düzenliyorsun';
   $('actNew').hidden=!!d;$('actEdit').hidden=!d;
+  $('btnKaydet').textContent=S.tur==='gelir'?'Geliri kaydet':'Gideri kaydet';
+  $('btnKaydet').style.background=S.tur==='gelir'?'var(--gelir)':'var(--gider)';$('btnKaydet').style.borderColor=$('btnKaydet').style.background;
 }
 function taksitIpucu(){
   const n=Number($('taksit').value)||1,h=$('taksitHint');
@@ -491,7 +493,8 @@ function kaydet(e){
   if(n<2){
     D.kayitlar.push(Object.assign({id:yeniId('r'),tarih,ay:tarih.slice(0,7),tutar:k,taksitli:false},taban));
     if(!kaydetDepo()){D.kayitlar.pop();return;}
-    toast(tl(k)+' kaydedildi'+(tarih.slice(0,7)!==BU_AY?' · '+ayAdi(tarih.slice(0,7)):'')+' · '+DEFTER[S.defter]);
+    if(S.tur==='gelir'){S.tur='gider';S.kategori=null;}
+    toast(tl(k)+(taban.tur==='gelir'?' gelir':' gider')+' kaydedildi'+(tarih.slice(0,7)!==BU_AY?' · '+ayAdi(tarih.slice(0,7)):'')+' · '+DEFTER[S.defter]);
   }else{
     const grup=yeniId('t'),aylik=Math.floor(k/n),art=k-aylik*n,yeni=[];
     for(let i=0;i<n;i++){const t=tarihKaydir(tarih,i);yeni.push(Object.assign({id:yeniId('r')+i,tarih:t,ay:t.slice(0,7),tutar:aylik+(i===0?art:0),taksitli:true,grup,sira:i+1,toplamTaksit:n},taban));}
@@ -819,7 +822,7 @@ $('katYeni').addEventListener('change',katYeniKaydet);
 function tazele(){
   const yeni=bugun();
   if(yeni!==BUGUN){const eskiAy=BU_AY;BUGUN=yeni;BU_AY=yeni.slice(0,7);
-    if(S.ay===eskiAy)S.ay=BU_AY;S.rBas=BU_AY+'-01';S.rBit=BUGUN;if(!S.duzenle)$('tarih').value=BUGUN;}
+    if(S.ay===eskiAy)S.ay=BU_AY;if(!S.duzenle){S.tur='gider';S.kategori=null;}S.rBas=BU_AY+'-01';S.rBit=BUGUN;if(!S.duzenle)$('tarih').value=BUGUN;}
   const s=lsOku(ANAHTAR);if(s&&s!==JSON.stringify(D)){try{D=duzelt(JSON.parse(s))}catch(e){}}
   ciz();
 }

@@ -325,6 +325,9 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
       <p class="note" style="margin-bottom:10px">Kesim günü: ekstrenin kesildiği gün. O günden sonraki harcamalar bir sonraki ekstreye yazılır. Boş bırakırsan takvim ayı sayılır.</p>
       <div id="kartListe"></div>
       <button type="button" class="ghost" id="kartEkle">Kart ekle</button></div>
+    <div class="card"><h3>Kayıt özeti</h3>
+      <p class="note" style="margin-bottom:8px">Bütün kayıtların defter ve aya göre dağılımı. Parantezde kayıt sayısı.</p>
+      <div style="overflow-x:auto"><table class="rtable num" id="ozet"></table></div></div>
     <div class="card"><h3>Yedek</h3>
       <p class="note" id="yedekBilgi" style="margin-bottom:10px"></p>
       <div class="actions"><button type="button" class="ghost" id="btnYedek">Yedek al</button><button type="button" class="ghost" id="btnGeriYukle">Yedekten yükle</button></div>
@@ -549,7 +552,12 @@ function cizAy(){
   if(!l.length)sub='Bu ay için kayıt yok.';
   else if(onceT>0){const f=gi-onceT;sub=`${kiyas} ${tl(Math.abs(f),false)} ${f>0?'fazla':'az'} harcadın.`;}
   if(S.ay===BU_AY&&gi)sub+=(sub?' ':'')+`Günlük ortalama ${tl(Math.round(gi/Number(BUGUN.slice(8))),false)}.`;
-  $('sSub').textContent=sub;
+  if(!gi){const df=D.kayitlar.filter(k=>k.tur==='gider'&&k.ay===S.ay&&k.defter!==S.defter).length,
+    ileri=defterKayit().filter(k=>k.tur==='gider'&&k.ay>S.ay).length,gelirN=l.filter(k=>k.tur==='gelir').length;
+    if(df)sub+=` ${DEFTER[S.defter==='kisisel'?'buro':'kisisel']} defterinde bu ay ${df} gider var.`;
+    if(ileri)sub+=` Sonraki aylara yazılı ${ileri} gider var.`;
+    if(gelirN&&!df&&!ileri)sub+=` Bu ay ${gelirN} kayıt gelir olarak girilmiş.`;}
+  $('sSub').textContent=sub.trim();
   // yedek hatırlatma
   const yu=$('yedekUyari'),kac=D.kayitlar.length;
   const eski=!D.sonYedek||gunFark(BUGUN,D.sonYedek)>30;
@@ -729,6 +737,10 @@ function cizAyar(){
     <label>Son ödeme<input id="kartSon${i}" data-kf="son" data-i="${i}" type="number" min="1" max="31" inputmode="numeric" value="${k.son||''}" placeholder="gün"></label>
     <button type="button" data-kartsil="${i}" aria-label="${esc(k.ad)} kaldır">✕</button></div>`).join('');
   $('yedekBilgi').textContent=`${D.kayitlar.length} kayıt var. `+(D.sonYedek?'Son yedek: '+tarihUzun(D.sonYedek)+'.':'Henüz yedek alınmadı.');
+  // kayıt özeti: hangi defterde, hangi ayda, gelir mi gider mi
+  const oz={};for(const k of D.kayitlar){const a=(oz[k.defter+'|'+k.ay]=oz[k.defter+'|'+k.ay]||{df:k.defter,ay:k.ay,gi:0,gin:0,ge:0,gen:0});if(k.tur==='gider'){a.gi+=k.tutar;a.gin++}else{a.ge+=k.tutar;a.gen++}}
+  const sat=Object.values(oz).sort((a,b)=>a.df.localeCompare(b.df)||a.ay.localeCompare(b.ay));
+  $('ozet').innerHTML=sat.length?'<tr><th>Defter · Ay</th><th>Gider</th><th>Gelir</th></tr>'+sat.map(a=>`<tr><td>${DEFTER[a.df]} · ${ayAdi(a.ay)}</td><td>${a.gin?tl(a.gi,false)+' <small>('+a.gin+')</small>':'–'}</td><td>${a.gen?tl(a.ge,false)+' <small>('+a.gen+')</small>':'–'}</td></tr>`).join(''):'<tr><td>Henüz kayıt yok.</td></tr>';
 }
 function katEkleAd(tur,ad){
   // eklenen (ya da zaten var olan) kategorinin adını döndürür

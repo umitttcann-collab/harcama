@@ -239,6 +239,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
           <button type="submit" class="primary">Güncelle</button>
           <button type="button" class="danger" id="btnSil">Sil</button>
           <button type="button" class="ghost" id="btnVazgec">Vazgeç</button>
+          <button type="button" class="ghost" id="btnTasi"></button>
         </div>
         <div class="confirm" id="silOnay" hidden><p id="silMetin"></p><div class="actions" id="silDugmeler"></div></div>
       </form>
@@ -454,6 +455,7 @@ function cizForm(){
   $('editHead').hidden=!d;
   if(d)$('editHead').textContent=d.taksitli?`Düzenleniyor: ${d.sira}/${d.toplamTaksit}. taksit (yalnız bu ay)`:'Kaydı düzenliyorsun';
   $('actNew').hidden=!!d;$('actEdit').hidden=!d;
+  if(d)$('btnTasi').textContent=(S.defter==='kisisel'?'Büro':'Kişisel')+' defterine taşı'+(d.taksitli?' (bütün taksitler)':'');
   $('btnKaydet').textContent=S.tur==='gelir'?'Geliri kaydet':'Gideri kaydet';
   $('btnKaydet').style.background=S.tur==='gelir'?'var(--gelir)':'var(--gider)';$('btnKaydet').style.borderColor=$('btnKaydet').style.background;
 }
@@ -604,9 +606,11 @@ function cizEkstre(){
       bilgi.push(s);
     }else if(odendi)bilgi.push('<span class="ok">ödendi</span>');
     const tk=l.filter(k=>k.taksitli).reduce((t,k)=>t+k.tutar,0);
+    const bu=l.filter(k=>k.defter===S.defter&&k.ay===S.ay).reduce((t,k)=>t+k.tutar,0),dis=top-bu;
+    const disNot=dis?`<div class="m">Bunun ${tl(dis,false)} kadarı ${[...new Set(l.filter(k=>!(k.defter===S.defter&&k.ay===S.ay)).map(k=>k.defter!==S.defter?DEFTER[k.defter]+' defterinde':ayAdi(k.ay)+' ayında'))].join(', ')} kayıtlı.</div>`:'';
     return `<div class="ek"><div class="ek-h"><span class="ad">${esc(kart.ad)}</span><span class="tt num">${tl(top)}</span></div>
       <div class="m">${bilgi.join(' · ')}</div>
-      ${top?`<div class="m num">${l.length} kalem${tk?`, bunun ${tl(tk,false)} kadarı taksit`:''}</div>
+      ${disNot}${top?`<div class="m num">${l.length} kalem${tk?`, bunun ${tl(tk,false)} kadarı taksit`:''}</div>
       <div><button type="button" class="ghost${odendi?' done':''}" data-odendi="${esc(an)}">${odendi?'Ödendi ✓ (geri al)':'Ödendi olarak işaretle'}</button></div>
       <details><summary>Kalemleri göster</summary>${l.map(k=>`<div class="mini"><span>${tarihKisa(k.tarih)} · ${esc(k.aciklama||k.kategori)}${k.taksitli?` (${k.sira}/${k.toplamTaksit})`:''}${k.defter!==S.defter?` · ${DEFTER[k.defter]}`:''}</span><span class="num">${tl(k.tutar)}</span></div>`).join('')}</details>`
       :'<div class="m">Bu ekstreye düşen harcama yok.</div>'}</div>`;
@@ -811,6 +815,11 @@ document.addEventListener('click',e=>{
     case 'filtreKaldir':S.filtre=null;cizAy();break;
     case 'btnVazgec':formSifirla();cizForm();break;
     case 'btnSil':silSor();break;
+    case 'btnTasi':{const d=S.duzenle;if(!d)break;const hedef=d.defter==='kisisel'?'buro':'kisisel';
+      const l=D.kayitlar.filter(x=>d.grup?x.grup===d.grup:x.id===d.id),once=l.map(x=>x.defter);
+      l.forEach(x=>x.defter=hedef);
+      if(!kaydetDepo()){l.forEach((x,i)=>x.defter=once[i]);break;}
+      S.defter=hedef;lsYaz('hd_defter',hedef);toast((l.length>1?l.length+' taksit ':'Kayıt ')+DEFTER[hedef]+' defterine taşındı');formSifirla();git('ay');break;}
     case 'btnRaporCsv':raporCsv();break;
     case 'ekleGider':katEkle('gider');break;
     case 'ekleGelir':katEkle('gelir');break;

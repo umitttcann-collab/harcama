@@ -333,7 +333,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
       <div class="actions"><button type="button" class="ghost" id="btnYedek">Yedek al</button><button type="button" class="ghost" id="btnGeriYukle">Yedekten yükle</button></div>
       <input type="file" id="yedekDosya" accept=".json,application/json" hidden>
       <div class="confirm" id="geriOnay" hidden style="margin-top:10px"><p id="geriMetin"></p>
-        <div class="actions"><button type="button" class="danger solid" id="geriEvet">Evet, yükle</button><button type="button" class="ghost" id="geriHayir">Vazgeç</button></div></div>
+        <div class="actions"><button type="button" class="primary" id="geriEvet">Ekle (telefondakiler kalır)</button><button type="button" class="ghost" id="geriHayir">Vazgeç</button></div></div>
     </div>
     <p class="note" style="text-align:center">Kayıtlar yalnız bu telefonda durur. Ayda bir yedek alıp iCloud Drive'a kaydet.</p>
   </section>
@@ -776,7 +776,7 @@ function yedekSec(f){
   r.onload=()=>{
     try{const v=JSON.parse(r.result);if(!v||!Array.isArray(v.kayitlar))throw 0;
       bekleyenYedek=duzelt(v);
-      $('geriMetin').textContent=`Yedekte ${bekleyenYedek.kayitlar.length} kayıt var${v.yedekTarihi?' ('+tarihUzun(v.yedekTarihi)+')':''}. Telefondaki ${D.kayitlar.length} kaydın yerine bunlar gelsin mi?`;
+      $('geriMetin').textContent=`Yedekte ${bekleyenYedek.kayitlar.length} kayıt var${v.yedekTarihi?' ('+tarihUzun(v.yedekTarihi)+')':''}. Telefondaki ${D.kayitlar.length} kayıt silinmez; yedekte olup telefonda olmayanlar eklenir.`;
       $('geriOnay').hidden=false;
     }catch(e){toast('Bu dosya bir Harcama yedeği değil.',true);}
     $('yedekDosya').value='';
@@ -819,7 +819,15 @@ document.addEventListener('click',e=>{
     case 'kartEkle':D.kartlar.push({id:yeniId('k'),ad:'Kart '+(D.kartlar.length+1),kesim:0,son:0});kaydetDepo();cizAyar();break;
     case 'btnYedek':case 'btnYedek2':yedekAl();break;
     case 'btnGeriYukle':$('yedekDosya').click();break;
-    case 'geriEvet':if(bekleyenYedek){const once=D;D=bekleyenYedek;if(kaydetDepo()){toast('Yedek yüklendi');}else D=once;bekleyenYedek=null;$('geriOnay').hidden=true;ciz();}break;
+    case 'geriEvet':if(bekleyenYedek){
+      // yedek telefondakilerin üzerine yazmaz, birleşir: aynı kayıt (aynı id) iki kez eklenmez
+      const once=JSON.stringify(D),y=bekleyenYedek,var_=new Set(D.kayitlar.map(k=>k.id));
+      const yeni=y.kayitlar.filter(k=>!var_.has(k.id));D.kayitlar.push(...yeni);
+      for(const df of ['kisisel','buro'])for(const t of ['gider','gelir']){const l=D.kat[df][t];for(const n of y.kat[df][t])if(!l.includes(n)){const di=l.indexOf('Diğer');if(di>=0)l.splice(di,0,n);else l.push(n);}}
+      for(const kr of y.kartlar)if(!D.kartlar.some(k=>k.id===kr.id))D.kartlar.push(kr);
+      for(const a in y.ekstre)if(!(a in D.ekstre))D.ekstre[a]=y.ekstre[a];
+      if(kaydetDepo())toast(yeni.length?yeni.length+' kayıt eklendi':'Yedekteki kayıtların hepsi zaten telefonda');else D=JSON.parse(once);
+      bekleyenYedek=null;$('geriOnay').hidden=true;ciz();}break;
     case 'geriHayir':bekleyenYedek=null;$('geriOnay').hidden=true;break;
   }
 });

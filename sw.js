@@ -1,6 +1,6 @@
 // Harcama Defteri: uygulama dosyalarını telefonda saklar, internet yokken de açılır.
 // Sürüm değişince eski önbellek silinir; yeni dosyalar arka planda iner, sonraki açılışta görünür.
-const SURUM = 'harcama-v3';
+const SURUM = 'harcama-v4';
 const DOSYALAR = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

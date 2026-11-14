@@ -434,6 +434,7 @@ function cizForm(){
   const d=S.duzenle;
   $('turGider').setAttribute('aria-pressed',S.tur==='gider');$('turGelir').setAttribute('aria-pressed',S.tur==='gelir');
   const kl=katListe(S.tur).slice();
+  for(const k of D.kayitlar)if(k.defter===S.defter&&k.tur===S.tur&&k.kategori&&!kl.includes(k.kategori)){const di=kl.indexOf('Diğer');kl.splice(di<0?kl.length:di,0,k.kategori);};
   if(d&&S.kategori&&!kl.includes(S.kategori))kl.push(S.kategori);
   if(!S.kategori||!kl.includes(S.kategori))S.kategori=kl[0];
   $('katChips').innerHTML=kl.map(n=>`<button type="button" class="chip" data-kat="${esc(n)}" aria-pressed="${n===S.kategori}">${esc(n)}</button>`).join('')+
@@ -732,11 +733,14 @@ function cizAyar(){
 function katEkleAd(tur,ad){
   // eklenen (ya da zaten var olan) kategorinin adını döndürür
   const n=String(ad||'').trim().replace(/\s+/g,' ').slice(0,40);if(!n)return null;
-  const l=D.kat[S.defter][tur],var_=l.find(x=>x.toLocaleLowerCase('tr')===n.toLocaleLowerCase('tr'));
+  // yeni kategori iki deftere de eklenir: hangi defterdeyken eklendiği karışmasın
+  const ayni=x=>x.toLocaleLowerCase('tr')===n.toLocaleLowerCase('tr');
+  const l=D.kat[S.defter][tur],var_=l.find(ayni);
   if(var_){toast(var_+' zaten var');return var_;}
-  const di=l.indexOf('Diğer');if(di>=0)l.splice(di,0,n);else l.push(n);
-  if(!kaydetDepo()){l.splice(l.indexOf(n),1);return null;}
-  toast(n+' eklendi ('+DEFTER[S.defter]+' · '+(tur==='gider'?'gider':'gelir')+')');return n;
+  const once=JSON.stringify(D.kat);
+  for(const df of ['kisisel','buro']){const x=D.kat[df][tur];if(x.some(ayni))continue;const di=x.indexOf('Diğer');if(di>=0)x.splice(di,0,n);else x.push(n);}
+  if(!kaydetDepo()){D.kat=JSON.parse(once);return null;}
+  toast(n+' eklendi ('+(tur==='gider'?'gider':'gelir')+' kategorisi)');return n;
 }
 function katEkle(tur){
   const inp=$(tur==='gider'?'yeniGider':'yeniGelir');if(!inp.value.trim())return;

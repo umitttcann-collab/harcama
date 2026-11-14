@@ -218,7 +218,8 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
           <button type="button" data-v="gelir" id="turGelir" aria-pressed="false">Gelir</button>
         </div>
         <label class="amount"><input id="tutar" inputmode="decimal" placeholder="0,00" aria-label="Tutar" enterkeyhint="done"><span>₺</span></label>
-        <div><span class="lbl">Kategori</span><div class="chips" id="katChips"></div></div>
+        <div><span class="lbl">Kategori</span><div class="chips" id="katChips"></div>
+          <div class="addrow" id="katYeniRow" hidden><input id="katYeni" placeholder="Yeni kategori adı" maxlength="40" enterkeyhint="done" autocomplete="off"><button type="button" class="ghost" id="katYeniEkle">Ekle</button></div></div>
         <div id="odemeBox"><span class="lbl">Nasıl ödendi?</span>
           <div class="chips" id="odemeChips">
             <button type="button" class="chip" data-o="nakit" aria-pressed="true">Nakit</button>
@@ -357,7 +358,7 @@ const ANAHTAR='harcama_defteri_v1';
 const $=id=>document.getElementById(id);
 const p2=n=>String(n).padStart(2,'0');
 function bugun(){const d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
-const BUGUN=bugun(),BU_AY=BUGUN.slice(0,7);
+let BUGUN=bugun(),BU_AY=BUGUN.slice(0,7);
 function ayKaydir(ay,n){let[y,m]=ay.split('-').map(Number);m+=n;y+=Math.floor((m-1)/12);m=((m-1)%12+12)%12+1;return y+'-'+p2(m);}
 function aySonu(ay){const[y,m]=ay.split('-').map(Number);return ay+'-'+p2(new Date(y,m,0).getDate());}
 function tarihKaydir(t,n){const a=ayKaydir(t.slice(0,7),n);const[y,m]=a.split('-').map(Number);return a+'-'+p2(Math.min(Number(t.slice(8)),new Date(y,m,0).getDate()));}
@@ -398,7 +399,7 @@ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}c
 
 const S={defter:lsOku('hd_defter')==='buro'?'buro':'kisisel',sekme:lsOku('hd_sekme')||'ekle',ay:BU_AY,filtre:null,
   tur:'gider',kategori:null,odeme:'nakit',kart:null,duzenle:null,
-  rDonem:lsOku('hd_rdonem')||'buay',rDefter:'aktif',rBas:BU_AY+'-01',rBit:BUGUN};
+  rDonem:lsOku('hd_rdonem')||'buay',rDefter:lsOku('hd_rdefter')==='hepsi'?'hepsi':'aktif',rBas:BU_AY+'-01',rBit:BUGUN};
 
 /* ---------- yardımcı hesaplar ---------- */
 const defterKayit=()=>D.kayitlar.filter(k=>k.defter===S.defter);
@@ -435,7 +436,8 @@ function cizForm(){
   const kl=katListe(S.tur).slice();
   if(d&&S.kategori&&!kl.includes(S.kategori))kl.push(S.kategori);
   if(!S.kategori||!kl.includes(S.kategori))S.kategori=kl[0];
-  $('katChips').innerHTML=kl.map(n=>`<button type="button" class="chip" data-kat="${esc(n)}" aria-pressed="${n===S.kategori}">${esc(n)}</button>`).join('');
+  $('katChips').innerHTML=kl.map(n=>`<button type="button" class="chip" data-kat="${esc(n)}" aria-pressed="${n===S.kategori}">${esc(n)}</button>`).join('')+
+    `<button type="button" class="chip" id="katYeniAc" style="border-style:dashed">+ Yeni</button>`;
   $('odemeBox').hidden=S.tur!=='gider';
   document.querySelectorAll('#odemeChips .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.o===S.odeme));
   const kartMi=S.tur==='gider'&&S.odeme==='kart';
@@ -489,13 +491,13 @@ function kaydet(e){
   if(n<2){
     D.kayitlar.push(Object.assign({id:yeniId('r'),tarih,ay:tarih.slice(0,7),tutar:k,taksitli:false},taban));
     if(!kaydetDepo()){D.kayitlar.pop();return;}
-    toast(tl(k)+' kaydedildi');
+    toast(tl(k)+' kaydedildi'+(tarih.slice(0,7)!==BU_AY?' · '+ayAdi(tarih.slice(0,7)):'')+' · '+DEFTER[S.defter]);
   }else{
     const grup=yeniId('t'),aylik=Math.floor(k/n),art=k-aylik*n,yeni=[];
     for(let i=0;i<n;i++){const t=tarihKaydir(tarih,i);yeni.push(Object.assign({id:yeniId('r')+i,tarih:t,ay:t.slice(0,7),tutar:aylik+(i===0?art:0),taksitli:true,grup,sira:i+1,toplamTaksit:n},taban));}
     D.kayitlar.push(...yeni);
     if(!kaydetDepo()){D.kayitlar.splice(-n);return;}
-    toast(`${n} taksit kaydedildi (aylık ${tl(aylik)})`);
+    toast(`${n} taksit kaydedildi (aylık ${tl(aylik)}, ilk ${ayAdi(tarih.slice(0,7))})`);
   }
   $('tutar').value='';$('aciklama').value='';$('taksit').value='1';$('tutar').blur();
   ciz();
@@ -628,10 +630,10 @@ function cizListe(){
 /* ---------- RAPOR ---------- */
 function donem(){
   const y=Number(BUGUN.slice(0,4)),d=S.rDonem;let bas,bit,obas,obit,ad;
-  if(d==='buay'){bas=BU_AY+'-01';bit=BUGUN;const o=ayKaydir(BU_AY,-1);obas=o+'-01';obit=gunTarih(o,Number(BUGUN.slice(8)));ad=ayAdi(BU_AY)+' (bugüne kadar)';}
+  if(d==='buay'){bas=BU_AY+'-01';bit=aySonu(BU_AY);const o=ayKaydir(BU_AY,-1);obas=o+'-01';obit=gunTarih(o,Number(BUGUN.slice(8)));ad=ayAdi(BU_AY);}
   else if(d==='gecenay'){const a=ayKaydir(BU_AY,-1);bas=a+'-01';bit=aySonu(a);const o=ayKaydir(a,-1);obas=o+'-01';obit=aySonu(o);ad=ayAdi(a);}
-  else if(d==='son3'){const a=ayKaydir(BU_AY,-2);bas=a+'-01';bit=BUGUN;const o=ayKaydir(a,-3);obas=o+'-01';obit=tarihKaydir(BUGUN,-3);ad='Son 3 ay';}
-  else if(d==='buyil'){bas=y+'-01-01';bit=BUGUN;obas=(y-1)+'-01-01';obit=(y-1)+BUGUN.slice(4);ad=y+' (bugüne kadar)';}
+  else if(d==='son3'){const a=ayKaydir(BU_AY,-2);bas=a+'-01';bit=aySonu(BU_AY);const o=ayKaydir(a,-3);obas=o+'-01';obit=tarihKaydir(BUGUN,-3);ad='Son 3 ay';}
+  else if(d==='buyil'){bas=y+'-01-01';bit=aySonu(BU_AY);obas=(y-1)+'-01-01';obit=(y-1)+BUGUN.slice(4);ad=y+' (bugüne kadar)';}
   else if(d==='gecenyil'){bas=(y-1)+'-01-01';bit=(y-1)+'-12-31';obas=(y-2)+'-01-01';obit=(y-2)+'-12-31';ad=String(y-1);}
   else{bas=S.rBas;bit=S.rBit;if(bas>bit)[bas,bit]=[bit,bas];const n=gunFark(bit,bas)+1;
     const dt=t=>{const x=new Date(t+'T12:00:00');x.setDate(x.getDate()-n);return x.getFullYear()+'-'+p2(x.getMonth()+1)+'-'+p2(x.getDate());};
@@ -653,10 +655,10 @@ function cizRapor(){
   if(!l.length)sub.push('Bu dönemde kayıt yok.');
   else{
     if(ogi>0){const f=gi-ogi,y=Math.round(Math.abs(f)/ogi*100);sub.push(`Önceki döneme göre gider ${tl(Math.abs(f),false)} ${f>0?'fazla':'az'} (%${y}).`);}
-    const gun=Math.max(1,gunFark(p.bit,p.bas)+1);sub.push(`Günde ortalama ${tl(Math.round(gi/gun),false)}.`);
+    const gun=Math.max(1,gunFark(p.bit<BUGUN?p.bit:BUGUN,p.bas)+1);sub.push(`Günde ortalama ${tl(Math.round(gi/gun),false)}.`);
   }
-  const ileri=D.kayitlar.filter(k=>k.taksitli&&k.tur==='gider'&&(S.rDefter==='hepsi'||k.defter===S.defter)&&k.tarih>BUGUN).reduce((t,k)=>t+k.tutar,0);
-  if(ileri&&p.bit>=BUGUN.slice(0,7)+'-01')sub.push(`İleri tarihli ${tl(ileri,false)} taksit bu rakamlara dahil değil.`);
+  if(p.bit>=BUGUN){const il=D.kayitlar.filter(k=>k.tur==='gider'&&(S.rDefter==='hepsi'||k.defter===S.defter)&&k.tarih>p.bit);
+    if(il.length)sub.push(`Sonraki aylara yazılı ${tl(il.reduce((t,k)=>t+k.tutar,0),false)} gider (${il.filter(k=>k.taksitli).length?'taksitler':'ileri tarihli'}) bu rakamlara dahil değil.`);}
   $('rSub').textContent=sub.join(' ');
   odemeCubugu(l,'rStack','rLeg');
   // kategoriler
@@ -724,12 +726,25 @@ function cizAyar(){
     <button type="button" data-kartsil="${i}" aria-label="${esc(k.ad)} kaldır">✕</button></div>`).join('');
   $('yedekBilgi').textContent=`${D.kayitlar.length} kayıt var. `+(D.sonYedek?'Son yedek: '+tarihUzun(D.sonYedek)+'.':'Henüz yedek alınmadı.');
 }
-function katEkle(tur){
-  const inp=$(tur==='gider'?'yeniGider':'yeniGelir'),n=inp.value.trim().slice(0,40);if(!n)return;
-  const l=D.kat[S.defter][tur];inp.value='';
-  if(l.some(x=>x.toLocaleLowerCase('tr')===n.toLocaleLowerCase('tr')))return;
+function katEkleAd(tur,ad){
+  // eklenen (ya da zaten var olan) kategorinin adını döndürür
+  const n=String(ad||'').trim().replace(/\s+/g,' ').slice(0,40);if(!n)return null;
+  const l=D.kat[S.defter][tur],var_=l.find(x=>x.toLocaleLowerCase('tr')===n.toLocaleLowerCase('tr'));
+  if(var_){toast(var_+' zaten var');return var_;}
   const di=l.indexOf('Diğer');if(di>=0)l.splice(di,0,n);else l.push(n);
-  kaydetDepo();cizAyar();toast(n+' eklendi');
+  if(!kaydetDepo()){l.splice(l.indexOf(n),1);return null;}
+  toast(n+' eklendi ('+DEFTER[S.defter]+' · '+(tur==='gider'?'gider':'gelir')+')');return n;
+}
+function katEkle(tur){
+  const inp=$(tur==='gider'?'yeniGider':'yeniGelir');if(!inp.value.trim())return;
+  const n=katEkleAd(tur,inp.value);inp.value='';
+  if(n&&S.tur===tur)S.kategori=n;
+  cizAyar();
+}
+function katYeniKaydet(){
+  const inp=$('katYeni');if(!inp.value.trim()){$('katYeniRow').hidden=true;return;}
+  const n=katEkleAd(S.tur,inp.value);inp.value='';
+  if(n)S.kategori=n;$('katYeniRow').hidden=true;cizForm();
 }
 async function yedekAl(){
   const ad=`harcama_yedek_${BUGUN}.json`;
@@ -768,7 +783,7 @@ document.addEventListener('click',e=>{
   if(ds.sil){sil(ds.sil);return;}
   if(ds.odendi){const x=D.ekstre[ds.odendi];D.ekstre[ds.odendi]=x&&x.odendi?{odendi:false}:{odendi:true,tarih:BUGUN};kaydetDepo();cizEkstre();return;}
   if(ds.d){S.rDonem=ds.d;lsYaz('hd_rdonem',ds.d);cizRapor();return;}
-  if(ds.rdf){S.rDefter=ds.rdf;cizRapor();return;}
+  if(ds.rdf){S.rDefter=ds.rdf;lsYaz('hd_rdefter',ds.rdf);cizRapor();return;}
   if(ds.kaldir){const l=D.kat[S.defter][ds.kaldir];if(l.length>1){l.splice(Number(ds.i),1);kaydetDepo();cizAyar();}else toast('En az bir kategori kalmalı.',true);return;}
   if(ds.kartsil!==undefined){if(D.kartlar.length>1){D.kartlar.splice(Number(ds.kartsil),1);kaydetDepo();cizAyar();}else toast('En az bir kart kalmalı.',true);return;}
   switch(t.id){
@@ -780,6 +795,8 @@ document.addEventListener('click',e=>{
     case 'btnRaporCsv':raporCsv();break;
     case 'ekleGider':katEkle('gider');break;
     case 'ekleGelir':katEkle('gelir');break;
+    case 'katYeniAc':{const row=$('katYeniRow');row.hidden=!row.hidden;if(!row.hidden)$('katYeni').focus();break;}
+    case 'katYeniEkle':katYeniKaydet();break;
     case 'kartEkle':D.kartlar.push({id:yeniId('k'),ad:'Kart '+(D.kartlar.length+1),kesim:0,son:0});kaydetDepo();cizAyar();break;
     case 'btnYedek':case 'btnYedek2':yedekAl();break;
     case 'btnGeriYukle':$('yedekDosya').click();break;
@@ -794,6 +811,20 @@ $('tutar').addEventListener('input',taksitIpucu);
 $('tarih').addEventListener('change',taksitIpucu);
 $('yeniGider').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();katEkle('gider')}});
 $('yeniGelir').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();katEkle('gelir')}});
+$('yeniGider').addEventListener('change',()=>katEkle('gider'));
+$('yeniGelir').addEventListener('change',()=>katEkle('gelir'));
+$('katYeni').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();katYeniKaydet()}});
+$('katYeni').addEventListener('change',katYeniKaydet);
+// telefon uygulaması günlerce açık kalabilir: gün değişince tarihleri yenile, başka sekmede yapılan değişikliği oku
+function tazele(){
+  const yeni=bugun();
+  if(yeni!==BUGUN){const eskiAy=BU_AY;BUGUN=yeni;BU_AY=yeni.slice(0,7);
+    if(S.ay===eskiAy)S.ay=BU_AY;S.rBas=BU_AY+'-01';S.rBit=BUGUN;if(!S.duzenle)$('tarih').value=BUGUN;}
+  const s=lsOku(ANAHTAR);if(s&&s!==JSON.stringify(D)){try{D=duzelt(JSON.parse(s))}catch(e){}}
+  ciz();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tazele();});
+window.addEventListener('pageshow',e=>{if(e.persisted)tazele();});
 $('yedekDosya').addEventListener('change',e=>yedekSec(e.target.files[0]));
 $('rBas').addEventListener('change',e=>{if(e.target.value){S.rBas=e.target.value;cizRapor();}});
 $('rBit').addEventListener('change',e=>{if(e.target.value){S.rBit=e.target.value;cizRapor();}});
